@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS Map Camera</title>
+    <style>
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+        #photo {
+            width: 100%;
+            height: auto;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h2>GPS Map Camera</h2>
+
+    <button onclick="capturePhoto()">Capture Photo</button>
+    <p id="location">Loading location...</p>
+    <div id="map"></div>
+    <canvas id="photo" width="640" height="480"></canvas>
+
+    <script>
+        let latitude, longitude;
+
+        // Get the user's location
+        navigator.geolocation.getCurrentPosition(showPosition, showError);
+
+        function showPosition(position) {
+            latitude = position.coords.latitude;
+            longitude = position.coords.longitude;
+            document.getElementById('location').textContent = `Latitude: ${latitude}, Longitude: ${longitude}`;
+            
+            // Initialize Google Map with the user's location
+            const map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: latitude, lng: longitude },
+                zoom: 15
+            });
+            const marker = new google.maps.Marker({ position: { lat: latitude, lng: longitude }, map: map });
+        }
+
+        function showError(error) {
+            document.getElementById('location').textContent = "Unable to retrieve location.";
+        }
+
+        // Capture photo and overlay location data
+        function capturePhoto() {
+            const canvas = document.getElementById('photo');
+            const context = canvas.getContext('2d');
+            
+            // Use the user's camera
+            navigator.mediaDevices.getUserMedia({ video: true })
+            .then((stream) => {
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+                video.addEventListener('loadeddata', () => {
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    stream.getTracks().forEach(track => track.stop());
+
+                    // Overlay location data on the photo
+                    context.font = '20px Arial';
+                    context.fillStyle = 'red';
+                    context.fillText(`Lat: ${latitude}, Lng: ${longitude}`, 10, canvas.height - 30);
+                });
+            })
+            .catch((error) => {
+                console.error('Camera access error: ', error);
+            });
+        }
+    </script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY"></script>
+</body>
+</html>
