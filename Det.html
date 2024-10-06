@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPS Map Camera</title>
+    <title>GPS Map Camera with Features</title>
     <style>
         body {
             margin: 0;
@@ -84,7 +84,7 @@
             bottom: 10px;
             width: 100%;
             display: flex;
-            justify-content: center;
+            justify-content: space-around;
         }
 
         .controls button {
@@ -93,15 +93,28 @@
             border: none;
             padding: 10px 20px;
             border-radius: 50px;
-            font-size: 18px;
+            font-size: 16px;
             cursor: pointer;
+        }
+
+        #canvas {
+            display: none;
+        }
+
+        #capturedImage {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 150px;
+            height: auto;
+            border: 2px solid #fff;
         }
     </style>
 </head>
 <body>
     <div id="container">
         <!-- Camera Video Feed -->
-        <video id="videoElement" autoplay></video>
+        <video id="videoElement" autoplay playsinline></video>
 
         <!-- Info Box Overlay -->
         <div id="info-box">
@@ -123,22 +136,85 @@
         <!-- Logos -->
         <img id="iem-logo" class="logo" src="path-to-iem-logo.png" alt="IEM Logo">
         <img id="uem-logo" class="logo" src="path-to-uem-logo.png" alt="UEM Logo">
+
+        <!-- Controls -->
+        <div class="controls">
+            <button id="captureBtn">Capture</button>
+            <button id="switchCameraBtn">Switch Camera</button>
+            <button id="toggleFlashBtn">Flashlight</button>
+        </div>
+
+        <!-- Canvas for capturing photo -->
+        <canvas id="canvas"></canvas>
+
+        <!-- Display captured image -->
+        <img id="capturedImage" src="" alt="Captured Image">
     </div>
 
     <script>
-        // Access camera
-        const video = document.getElementById('videoElement');
+        let video = document.getElementById('videoElement');
+        let canvas = document.getElementById('canvas');
+        let capturedImage = document.getElementById('capturedImage');
+        let switchCameraBtn = document.getElementById('switchCameraBtn');
+        let toggleFlashBtn = document.getElementById('toggleFlashBtn');
+        let captureBtn = document.getElementById('captureBtn');
+        
+        let isFrontCamera = true;
+        let currentStream = null;
+        let track = null;
 
-        // Request camera access and display the video feed
-        navigator.mediaDevices.getUserMedia({ video: true })
-        .then((stream) => {
-            video.srcObject = stream;
-        })
-        .catch((error) => {
-            console.error('Error accessing the camera: ', error);
+        // Access camera
+        function startCamera(cameraFacingMode = 'user') {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+
+            navigator.mediaDevices.getUserMedia({
+                video: { facingMode: cameraFacingMode },
+            })
+            .then((stream) => {
+                video.srcObject = stream;
+                currentStream = stream;
+                track = stream.getVideoTracks()[0];
+            })
+            .catch((error) => {
+                console.error('Error accessing the camera: ', error);
+            });
+        }
+
+        // Toggle between front and back camera
+        switchCameraBtn.addEventListener('click', () => {
+            isFrontCamera = !isFrontCamera;
+            startCamera(isFrontCamera ? 'user' : 'environment');
         });
 
-        // Get live GPS data
+        // Capture image from video feed
+        captureBtn.addEventListener('click', () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            let context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Display captured image
+            let imageDataURL = canvas.toDataURL('image/png');
+            capturedImage.src = imageDataURL;
+            capturedImage.style.display = 'block';
+        });
+
+        // Toggle flashlight (torch mode)
+        toggleFlashBtn.addEventListener('click', () => {
+            if (track && track.getCapabilities().torch) {
+                let torchMode = track.getSettings().torch;
+                track.applyConstraints({ advanced: [{ torch: !torchMode }] });
+            } else {
+                alert('Flashlight is not supported on this device.');
+            }
+        });
+
+        // Initialize with front camera
+        startCamera();
+
+        // Geolocation
         let latitude, longitude, speed = 0, altitude = 0;
 
         if (navigator.geolocation) {
