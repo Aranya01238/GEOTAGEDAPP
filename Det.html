@@ -76,7 +76,11 @@
                     altitude = position.coords.altitude || 0; // Altitude in meters
                     // Placeholder for address fetching (requires additional service)
                     address = `Lat: ${latitude}, Lon: ${longitude}`;
+                }, (error) => {
+                    console.error("Error getting location: ", error);
                 });
+            } else {
+                alert("Geolocation is not supported by this browser.");
             }
         }
 
@@ -87,13 +91,23 @@
                     facingMode: isFrontCamera ? 'user' : 'environment'
                 }
             };
-            stream = await navigator.mediaDevices.getUserMedia(constraints);
-            video.srcObject = stream;
-            getLocation();
+            try {
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                getLocation();
+            } catch (err) {
+                console.error("Error accessing camera: ", err);
+                alert("Unable to access the camera. Please check permissions.");
+            }
         }
 
         // Capture image with geo-tag and logos
         captureBtn.addEventListener('click', () => {
+            if (!stream) {
+                alert("Camera stream is not available.");
+                return;
+            }
+
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             let context = canvas.getContext('2d');
