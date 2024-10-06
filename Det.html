@@ -15,12 +15,15 @@
 
         #container {
             position: relative;
-            text-align: center;
+            height: 100vh;
+            overflow: hidden;
         }
 
-        #photo {
+        #videoElement {
             width: 100%;
-            height: auto;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror the video for front-facing camera */
         }
 
         #info-box {
@@ -59,6 +62,23 @@
             margin-right: 5px;
         }
 
+        .logo {
+            position: absolute;
+            z-index: 999;
+        }
+
+        #iem-logo {
+            top: 10px;
+            right: 10px;
+            width: 60px;
+        }
+
+        #uem-logo {
+            top: 10px;
+            left: 10px;
+            width: 60px;
+        }
+
         .controls {
             position: fixed;
             bottom: 10px;
@@ -76,39 +96,20 @@
             font-size: 18px;
             cursor: pointer;
         }
-
-        .logo {
-            position: absolute;
-            z-index: 999;
-        }
-
-        #iem-logo {
-            top: 10px;
-            right: 10px;
-        }
-
-        #uem-logo {
-            top: 10px;
-            left: 10px;
-        }
-
     </style>
 </head>
 <body>
-    <!-- Container for camera photo and info -->
     <div id="container">
-        <img id="photo" src="path-to-photo.jpg" alt="Captured Photo">
+        <!-- Camera Video Feed -->
+        <video id="videoElement" autoplay></video>
 
         <!-- Info Box Overlay -->
         <div id="info-box">
             <div id="location">Loading location...</div>
-            <div id="address"></div>
+            <div id="address">Retrieving address...</div>
             <div id="details">
                 <div class="detail-item">
                     <img src="speed-icon.png" alt="Speed"> <span id="speed">0 km/h</span>
-                </div>
-                <div class="detail-item">
-                    <img src="battery-icon.png" alt="Battery"> 82%
                 </div>
                 <div class="detail-item">
                     <img src="altitude-icon.png" alt="Altitude"> <span id="altitude">0 m</span>
@@ -120,20 +121,31 @@
         </div>
 
         <!-- Logos -->
-        <img id="iem-logo" class="logo" src="path-to-iem-logo.png" alt="IEM Logo" width="100">
-        <img id="uem-logo" class="logo" src="path-to-uem-logo.png" alt="UEM Logo" width="100">
-    </div>
-
-    <!-- Capture Button -->
-    <div class="controls">
-        <button onclick="capturePhoto()">Capture Photo</button>
+        <img id="iem-logo" class="logo" src="path-to-iem-logo.png" alt="IEM Logo">
+        <img id="uem-logo" class="logo" src="path-to-uem-logo.png" alt="UEM Logo">
     </div>
 
     <script>
+        // Access camera
+        const video = document.getElementById('videoElement');
+
+        // Request camera access and display the video feed
+        navigator.mediaDevices.getUserMedia({ video: true })
+        .then((stream) => {
+            video.srcObject = stream;
+        })
+        .catch((error) => {
+            console.error('Error accessing the camera: ', error);
+        });
+
+        // Get live GPS data
         let latitude, longitude, speed = 0, altitude = 0;
 
-        // Get the current location, speed, altitude, and date/time
-        navigator.geolocation.getCurrentPosition(showPosition, showError, { enableHighAccuracy: true });
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(showPosition, showError, { enableHighAccuracy: true });
+        } else {
+            alert("Geolocation is not supported by this browser.");
+        }
 
         function showPosition(position) {
             latitude = position.coords.latitude;
@@ -146,7 +158,7 @@
             document.getElementById('altitude').textContent = `${altitude} m`;
             document.getElementById('datetime').textContent = new Date().toLocaleString();
 
-            // Optional: Use reverse geocoding API (like Google Maps Geocoding) to convert lat/lng into an address
+            // Fetch address using reverse geocoding (Google Maps API)
             fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=YOUR_GOOGLE_MAPS_API_KEY`)
             .then(response => response.json())
             .then(data => {
@@ -159,40 +171,24 @@
         }
 
         function showError(error) {
-            document.getElementById('location').textContent = "Unable to retrieve location.";
-        }
-
-        // Capture photo function
-        function capturePhoto() {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            const video = document.createElement('video');
-
-            // Get the video stream from the camera
-            navigator.mediaDevices.getUserMedia({ video: true })
-            .then((stream) => {
-                video.srcObject = stream;
-                video.play();
-
-                video.addEventListener('loadeddata', () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                    // Stop the stream after capturing the frame
-                    stream.getTracks().forEach(track => track.stop());
-
-                    // Set captured image as the photo
-                    document.getElementById('photo').src = canvas.toDataURL('image/png');
-                });
-            })
-            .catch((error) => {
-                console.error('Camera access error: ', error);
-            });
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    alert("User denied the request for Geolocation.");
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    alert("Location information is unavailable.");
+                    break;
+                case error.TIMEOUT:
+                    alert("The request to get user location timed out.");
+                    break;
+                case error.UNKNOWN_ERROR:
+                    alert("An unknown error occurred.");
+                    break;
+            }
         }
     </script>
 
-    <!-- Optional: Google Maps API for reverse geocoding -->
+    <!-- Google Maps API for reverse geocoding -->
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY"></script>
 </body>
 </html>
