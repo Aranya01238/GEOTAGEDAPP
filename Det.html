@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPS Map Camera with Features</title>
+    <title>GPS Map Camera with Geo-tagging</title>
     <style>
         body {
             margin: 0;
@@ -23,7 +23,6 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scaleX(-1); /* Mirror the video for front-facing camera */
         }
 
         #info-box {
@@ -162,6 +161,7 @@
         let isFrontCamera = true;
         let currentStream = null;
         let track = null;
+        let latitude, longitude, speed = 0, altitude = 0, address = '';
 
         // Access camera
         function startCamera(cameraFacingMode = 'user') {
@@ -188,17 +188,30 @@
             startCamera(isFrontCamera ? 'user' : 'environment');
         });
 
-        // Capture image from video feed
+        // Capture image with geo-tag
         captureBtn.addEventListener('click', () => {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             let context = canvas.getContext('2d');
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+            // Overlay geo-tag on the image
+            context.font = '20px Arial';
+            context.fillStyle = 'white';
+            context.fillText(`Lat: ${latitude}, Lon: ${longitude}`, 10, 30);
+            context.fillText(`Speed: ${speed} km/h, Alt: ${altitude} m`, 10, 60);
+            context.fillText(`Address: ${address}`, 10, 90);
+
             // Display captured image
             let imageDataURL = canvas.toDataURL('image/png');
             capturedImage.src = imageDataURL;
             capturedImage.style.display = 'block';
+
+            // Save the image to the gallery
+            let link = document.createElement('a');
+            link.href = imageDataURL;
+            link.download = `geo-tagged-image-${Date.now()}.png`;
+            link.click();
         });
 
         // Toggle flashlight (torch mode)
@@ -215,8 +228,6 @@
         startCamera();
 
         // Geolocation
-        let latitude, longitude, speed = 0, altitude = 0;
-
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(showPosition, showError, { enableHighAccuracy: true });
         } else {
@@ -239,7 +250,8 @@
             .then(response => response.json())
             .then(data => {
                 if (data.results[0]) {
-                    document.getElementById('address').textContent = data.results[0].formatted_address;
+                    address = data.results[0].formatted_address;
+                    document.getElementById('address').textContent = address;
                 } else {
                     document.getElementById('address').textContent = "Address not found";
                 }
@@ -263,8 +275,5 @@
             }
         }
     </script>
-
-    <!-- Google Maps API for reverse geocoding -->
-    <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY"></script>
 </body>
 </html>
