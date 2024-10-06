@@ -3,192 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPS Map Camera with Geo-tagging</title>
+    <title>GPS Map Camera</title>
     <style>
         body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-            background-color: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #000;
             color: #fff;
         }
-
-        #container {
-            position: relative;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        #videoElement {
+        video, canvas {
             width: 100%;
-            height: 100%;
-            object-fit: cover;
+            max-width: 600px;
+            height: auto;
         }
-
-        #info-box {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            background: rgba(0, 0, 0, 0.6);
-            padding: 15px;
-            text-align: left;
+        #capturedImage {
+            display: none;
+            margin-top: 20px;
+            max-width: 100%;
         }
-
-        #location {
-            font-size: 18px;
-            font-weight: bold;
+        .controls {
+            margin: 20px;
         }
-
-        #address {
-            font-size: 14px;
-        }
-
-        #details {
-            margin-top: 10px;
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-        }
-
-        .detail-item {
-            display: flex;
-            align-items: center;
-        }
-
-        .detail-item img {
-            width: 15px;
-            margin-right: 5px;
-        }
-
         .logo {
             position: absolute;
-            z-index: 999;
-        }
-
-        #iem-logo {
             top: 10px;
-            right: 10px;
             width: 60px;
-        }
-
-        #uem-logo {
-            top: 10px;
-            left: 10px;
-            width: 60px;
-        }
-
-        .controls {
-            position: fixed;
-            bottom: 10px;
-            width: 100%;
-            display: flex;
-            justify-content: space-around;
-        }
-
-        .controls button {
-            background-color: #222;
-            color: #fff;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 50px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-
-        #canvas {
-            display: none;
-        }
-
-        #capturedImage {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            width: 150px;
-            height: auto;
-            border: 2px solid #fff;
+            height: 60px;
         }
     </style>
 </head>
 <body>
-    <div id="container">
-        <!-- Camera Video Feed -->
-        <video id="videoElement" autoplay playsinline></video>
 
-        <!-- Info Box Overlay -->
-        <div id="info-box">
-            <div id="location">Loading location...</div>
-            <div id="address">Retrieving address...</div>
-            <div id="details">
-                <div class="detail-item">
-                    <img src="speed-icon.png" alt="Speed"> <span id="speed">0 km/h</span>
-                </div>
-                <div class="detail-item">
-                    <img src="altitude-icon.png" alt="Altitude"> <span id="altitude">0 m</span>
-                </div>
-                <div class="detail-item">
-                    <span id="datetime">00:00:00</span>
-                </div>
-            </div>
-        </div>
+    <video id="video" autoplay></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <img id="capturedImage" alt="Captured Image"/>
 
-        <!-- Logos -->
-        <img id="iem-logo" class="logo" src="path-to-iem-logo.png" alt="IEM Logo">
-        <img id="uem-logo" class="logo" src="path-to-uem-logo.png" alt="UEM Logo">
-
-        <!-- Controls -->
-        <div class="controls">
-            <button id="captureBtn">Capture</button>
-            <button id="switchCameraBtn">Switch Camera</button>
-            <button id="toggleFlashBtn">Flashlight</button>
-        </div>
-
-        <!-- Canvas for capturing photo -->
-        <canvas id="canvas"></canvas>
-
-        <!-- Display captured image -->
-        <img id="capturedImage" src="" alt="Captured Image">
+    <div class="controls">
+        <button id="captureBtn">Capture</button>
+        <button id="switchCameraBtn">Switch Camera</button>
+        <button id="flashlightBtn">Toggle Flashlight</button>
+        <button id="previousBtn">Previous Picture</button>
     </div>
 
     <script>
-        let video = document.getElementById('videoElement');
-        let canvas = document.getElementById('canvas');
-        let capturedImage = document.getElementById('capturedImage');
-        let switchCameraBtn = document.getElementById('switchCameraBtn');
-        let toggleFlashBtn = document.getElementById('toggleFlashBtn');
-        let captureBtn = document.getElementById('captureBtn');
-        
-        let isFrontCamera = true;
-        let currentStream = null;
-        let track = null;
-        let latitude, longitude, speed = 0, altitude = 0, address = '';
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const capturedImage = document.getElementById('capturedImage');
+        const captureBtn = document.getElementById('captureBtn');
+        const switchCameraBtn = document.getElementById('switchCameraBtn');
+        const flashlightBtn = document.getElementById('flashlightBtn');
+        const previousBtn = document.getElementById('previousBtn');
 
-        // Access camera
-        function startCamera(cameraFacingMode = 'user') {
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop());
+        let stream;
+        let isFrontCamera = false;
+        let previousImages = [];
+
+        // Get location information
+        let latitude = 0;
+        let longitude = 0;
+        let speed = 0;
+        let altitude = 0;
+        let address = 'Unknown Location';
+
+        // Geolocation API
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    latitude = position.coords.latitude;
+                    longitude = position.coords.longitude;
+                    speed = position.coords.speed || 0; // Speed in m/s
+                    altitude = position.coords.altitude || 0; // Altitude in meters
+                    // Placeholder for address fetching (requires additional service)
+                    address = `Lat: ${latitude}, Lon: ${longitude}`;
+                });
             }
-
-            navigator.mediaDevices.getUserMedia({
-                video: { facingMode: cameraFacingMode },
-            })
-            .then((stream) => {
-                video.srcObject = stream;
-                currentStream = stream;
-                track = stream.getVideoTracks()[0];
-            })
-            .catch((error) => {
-                console.error('Error accessing the camera: ', error);
-            });
         }
 
-        // Toggle between front and back camera
-        switchCameraBtn.addEventListener('click', () => {
-            isFrontCamera = !isFrontCamera;
-            startCamera(isFrontCamera ? 'user' : 'environment');
-        });
+        // Start video stream
+        async function startCamera() {
+            const constraints = {
+                video: {
+                    facingMode: isFrontCamera ? 'user' : 'environment'
+                }
+            };
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = stream;
+            getLocation();
+        }
 
-        // Capture image with geo-tag
+        // Capture image with geo-tag and logos
         captureBtn.addEventListener('click', () => {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
@@ -199,81 +103,66 @@
             context.font = '20px Arial';
             context.fillStyle = 'white';
             context.fillText(`Lat: ${latitude}, Lon: ${longitude}`, 10, 30);
-            context.fillText(`Speed: ${speed} km/h, Alt: ${altitude} m`, 10, 60);
-            context.fillText(`Address: ${address}`, 10, 90);
+            context.fillText(`Speed: ${speed.toFixed(2)} m/s`, 10, 60);
+            context.fillText(`Altitude: ${altitude.toFixed(2)} m`, 10, 90);
+            context.fillText(`Address: ${address}`, 10, 120);
+            
+            // Load and draw logos
+            const iemLogo = new Image();
+            iemLogo.src = 'path-to-iem-logo.png'; // Update this path
+            iemLogo.onload = () => {
+                context.drawImage(iemLogo, canvas.width - 160, 10, 60, 60); // Position the IEM logo
 
-            // Display captured image
-            let imageDataURL = canvas.toDataURL('image/png');
-            capturedImage.src = imageDataURL;
-            capturedImage.style.display = 'block';
+                const uemLogo = new Image();
+                uemLogo.src = 'path-to-uem-logo.png'; // Update this path
+                uemLogo.onload = () => {
+                    context.drawImage(uemLogo, 10, 10, 60, 60); // Position the UEM logo
 
-            // Save the image to the gallery
-            let link = document.createElement('a');
-            link.href = imageDataURL;
-            link.download = `geo-tagged-image-${Date.now()}.png`;
-            link.click();
+                    // Display captured image
+                    let imageDataURL = canvas.toDataURL('image/png');
+                    capturedImage.src = imageDataURL;
+                    capturedImage.style.display = 'block';
+
+                    // Save the image to the gallery
+                    previousImages.push(imageDataURL); // Save to previous images array
+                    let link = document.createElement('a');
+                    link.href = imageDataURL;
+                    link.download = `geo-tagged-image-${Date.now()}.png`;
+                    link.click();
+                };
+            };
         });
 
-        // Toggle flashlight (torch mode)
-        toggleFlashBtn.addEventListener('click', () => {
-            if (track && track.getCapabilities().torch) {
-                let torchMode = track.getSettings().torch;
-                track.applyConstraints({ advanced: [{ torch: !torchMode }] });
+        // Switch camera
+        switchCameraBtn.addEventListener('click', () => {
+            isFrontCamera = !isFrontCamera;
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            startCamera();
+        });
+
+        // Toggle flashlight (for mobile devices)
+        flashlightBtn.addEventListener('click', () => {
+            const track = stream.getVideoTracks()[0];
+            const capabilities = track.getCapabilities();
+            if (capabilities.torch) {
+                track.applyConstraints({ advanced: [{ torch: !track.torch }] });
+            }
+        });
+
+        // Show previous picture
+        previousBtn.addEventListener('click', () => {
+            if (previousImages.length > 0) {
+                capturedImage.src = previousImages[previousImages.length - 1];
+                capturedImage.style.display = 'block';
             } else {
-                alert('Flashlight is not supported on this device.');
+                alert('No previous pictures available.');
             }
         });
 
-        // Initialize with front camera
-        startCamera();
-
-        // Geolocation
-        if (navigator.geolocation) {
-            navigator.geolocation.watchPosition(showPosition, showError, { enableHighAccuracy: true });
-        } else {
-            alert("Geolocation is not supported by this browser.");
-        }
-
-        function showPosition(position) {
-            latitude = position.coords.latitude;
-            longitude = position.coords.longitude;
-            speed = position.coords.speed ? (position.coords.speed * 3.6).toFixed(2) : '0'; // Convert m/s to km/h
-            altitude = position.coords.altitude ? position.coords.altitude.toFixed(2) : '0';
-
-            document.getElementById('location').textContent = `Latitude: ${latitude}, Longitude: ${longitude}`;
-            document.getElementById('speed').textContent = `${speed} km/h`;
-            document.getElementById('altitude').textContent = `${altitude} m`;
-            document.getElementById('datetime').textContent = new Date().toLocaleString();
-
-            // Fetch address using reverse geocoding (Google Maps API)
-            fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=YOUR_GOOGLE_MAPS_API_KEY`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.results[0]) {
-                    address = data.results[0].formatted_address;
-                    document.getElementById('address').textContent = address;
-                } else {
-                    document.getElementById('address').textContent = "Address not found";
-                }
-            });
-        }
-
-        function showError(error) {
-            switch(error.code) {
-                case error.PERMISSION_DENIED:
-                    alert("User denied the request for Geolocation.");
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    alert("Location information is unavailable.");
-                    break;
-                case error.TIMEOUT:
-                    alert("The request to get user location timed out.");
-                    break;
-                case error.UNKNOWN_ERROR:
-                    alert("An unknown error occurred.");
-                    break;
-            }
-        }
+        // Start the camera on load
+        window.onload = startCamera;
     </script>
 </body>
 </html>
