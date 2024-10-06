@@ -5,86 +5,185 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GPS Map Camera</title>
     <style>
-        #map {
-            height: 400px;
-            width: 100%;
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #000;
+            color: #fff;
         }
+
+        #container {
+            position: relative;
+            text-align: center;
+        }
+
         #photo {
             width: 100%;
             height: auto;
-            margin-top: 20px;
         }
+
+        #info-box {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px;
+            text-align: left;
+        }
+
+        #location {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        #address {
+            font-size: 14px;
+        }
+
+        #details {
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+
+        .detail-item {
+            display: flex;
+            align-items: center;
+        }
+
+        .detail-item img {
+            width: 15px;
+            margin-right: 5px;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 10px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        .controls button {
+            background-color: #222;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
         .logo {
             position: absolute;
             z-index: 999;
         }
+
         #iem-logo {
             top: 10px;
             right: 10px;
         }
+
         #uem-logo {
             top: 10px;
             left: 10px;
         }
+
     </style>
 </head>
 <body>
-    <h2>GPS Map Camera</h2>
+    <!-- Container for camera photo and info -->
+    <div id="container">
+        <img id="photo" src="path-to-photo.jpg" alt="Captured Photo">
 
-    <!-- Logos -->
-    <img id="iem-logo" class="logo" src="path-to-iem-logo.png" alt="IEM Logo" width="100">
-    <img id="uem-logo" class="logo" src="path-to-uem-logo.png" alt="UEM Logo" width="100">
+        <!-- Info Box Overlay -->
+        <div id="info-box">
+            <div id="location">Loading location...</div>
+            <div id="address"></div>
+            <div id="details">
+                <div class="detail-item">
+                    <img src="speed-icon.png" alt="Speed"> <span id="speed">0 km/h</span>
+                </div>
+                <div class="detail-item">
+                    <img src="battery-icon.png" alt="Battery"> 82%
+                </div>
+                <div class="detail-item">
+                    <img src="altitude-icon.png" alt="Altitude"> <span id="altitude">0 m</span>
+                </div>
+                <div class="detail-item">
+                    <span id="datetime">00:00:00</span>
+                </div>
+            </div>
+        </div>
 
-    <button onclick="capturePhoto()">Capture Photo</button>
-    <p id="location">Loading location...</p>
-    <div id="map"></div>
-    <canvas id="photo" width="640" height="480"></canvas>
+        <!-- Logos -->
+        <img id="iem-logo" class="logo" src="path-to-iem-logo.png" alt="IEM Logo" width="100">
+        <img id="uem-logo" class="logo" src="path-to-uem-logo.png" alt="UEM Logo" width="100">
+    </div>
+
+    <!-- Capture Button -->
+    <div class="controls">
+        <button onclick="capturePhoto()">Capture Photo</button>
+    </div>
 
     <script>
-        let latitude, longitude;
+        let latitude, longitude, speed = 0, altitude = 0;
 
-        // Get the user's location
-        navigator.geolocation.getCurrentPosition(showPosition, showError);
+        // Get the current location, speed, altitude, and date/time
+        navigator.geolocation.getCurrentPosition(showPosition, showError, { enableHighAccuracy: true });
 
         function showPosition(position) {
             latitude = position.coords.latitude;
             longitude = position.coords.longitude;
-            document.getElementById('location').textContent = `Latitude: ${latitude}, Longitude: ${longitude}`;
+            speed = position.coords.speed ? (position.coords.speed * 3.6).toFixed(2) : '0'; // Convert m/s to km/h
+            altitude = position.coords.altitude ? position.coords.altitude.toFixed(2) : '0';
 
-            // Initialize Google Map with the user's location
-            const map = new google.maps.Map(document.getElementById('map'), {
-                center: { lat: latitude, lng: longitude },
-                zoom: 15
+            document.getElementById('location').textContent = `Latitude: ${latitude}, Longitude: ${longitude}`;
+            document.getElementById('speed').textContent = `${speed} km/h`;
+            document.getElementById('altitude').textContent = `${altitude} m`;
+            document.getElementById('datetime').textContent = new Date().toLocaleString();
+
+            // Optional: Use reverse geocoding API (like Google Maps Geocoding) to convert lat/lng into an address
+            fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=YOUR_GOOGLE_MAPS_API_KEY`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.results[0]) {
+                    document.getElementById('address').textContent = data.results[0].formatted_address;
+                } else {
+                    document.getElementById('address').textContent = "Address not found";
+                }
             });
-            const marker = new google.maps.Marker({ position: { lat: latitude, lng: longitude }, map: map });
         }
 
         function showError(error) {
             document.getElementById('location').textContent = "Unable to retrieve location.";
         }
 
-        // Capture photo and overlay location data
+        // Capture photo function
         function capturePhoto() {
-            const canvas = document.getElementById('photo');
+            const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
+            const video = document.createElement('video');
 
-            // Use the user's camera
+            // Get the video stream from the camera
             navigator.mediaDevices.getUserMedia({ video: true })
             .then((stream) => {
-                const video = document.createElement('video');
                 video.srcObject = stream;
                 video.play();
 
                 video.addEventListener('loadeddata', () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
                     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
                     // Stop the stream after capturing the frame
                     stream.getTracks().forEach(track => track.stop());
 
-                    // Overlay location data on the photo
-                    context.font = '20px Arial';
-                    context.fillStyle = 'red';
-                    context.fillText(`Lat: ${latitude}, Lng: ${longitude}`, 10, canvas.height - 30);
+                    // Set captured image as the photo
+                    document.getElementById('photo').src = canvas.toDataURL('image/png');
                 });
             })
             .catch((error) => {
@@ -93,7 +192,7 @@
         }
     </script>
 
-    <!-- Google Maps API -->
+    <!-- Optional: Google Maps API for reverse geocoding -->
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY"></script>
 </body>
 </html>
